@@ -73,7 +73,6 @@ public class AdabasAuditingFilter implements Filter {
             Data data = null;
             if (f instanceof HashMap<?, ?>) {
                 final HashMap<String, Object> map = (HashMap<String, Object>) f;
-                logger.debug("Event map: {}", map);
                 if (map.containsKey("UABI_ITEMS")) {
                     // extract data from the map
                     final HashMap<String, Object> items = (HashMap<String, Object>) map.get("UABI_ITEMS");
@@ -84,37 +83,41 @@ public class AdabasAuditingFilter implements Filter {
                     // extract data from ACBX or CLNT
                     if (items.containsKey("UABD_ITEMS")) {
                         final Object item = items.get("UABD_ITEMS");
+
                         if (item instanceof ArrayList<?>) {
+                            // If it's an ArrayList, convert it to a single object (e.g., the first element)
                             final ArrayList<HashMap<String, Object>> list = (ArrayList<HashMap<String, Object>>) item;
-                            HashMap<String, Object> clnt = null;
-                            HashMap<String, Object> acbx = null;
-                            HashMap<String, Object> fbuf = null;
-                            for (final HashMap<String, Object> itemMap : list) {
-                                itemMap.get("UABDTY");
-                                final String type = itemMap.get("UABDTY").toString();
-                                if (type.equals("ACBX") || type.equals("CLNT") || type.equals("FBUF")) {
-                                    if (itemMap.containsKey("PAYLOAD_CLNT")) {
-                                        clnt = (HashMap<String, Object>) itemMap.get("PAYLOAD_CLNT");
-                                        // cnlt data for the record
+                            if (!list.isEmpty()) {
+                                for (HashMap<String, Object> singleItem : list) {
+                                    logger.debug("Processing item in list: {}", item);
+
+                                    // Process each item in the list
+                                    if (singleItem.containsKey("PAYLOAD_CLNT")) {
+                                        final HashMap<String, Object> clnt = (HashMap<String, Object>) singleItem
+                                                .get("PAYLOAD_CLNT");
                                         if (clnt.containsKey(RECORD_APP_USER_NAME)) {
                                             record.setAppUserName(clnt.get(RECORD_APP_USER_NAME).toString());
                                         }
-                                        // fill accessor data
                                         accessor = parseAccessor(clnt);
                                     }
-                                    if (itemMap.containsKey("PAYLOAD_ACBX")) {
-                                        acbx = (HashMap<String, Object>) itemMap.get("PAYLOAD_ACBX");
-                                        // acbx data for the record
+                                    if (singleItem.containsKey("PAYLOAD_ACBX")) {
+                                        final HashMap<String, Object> acbx = (HashMap<String, Object>) singleItem
+                                                .get("PAYLOAD_ACBX");
                                         if (acbx.containsKey(RECORD_SESSION_ID)) {
                                             record.setSessionId(acbx.get(RECORD_SESSION_ID).toString());
                                         }
                                     }
-                                    if (itemMap.containsKey("PAYLOAD_FBUF")) {
-                                        fbuf = (HashMap<String, Object>) itemMap.get("PAYLOAD_FBUF");
+                                    if (singleItem.containsKey("PAYLOAD_FBUF")) {
+                                        final HashMap<String, Object> fbuf = (HashMap<String, Object>) singleItem
+                                                .get("PAYLOAD_FBUF");
+                                        data = parseData(null, null, fbuf);
                                     }
                                 }
                             }
-                            data = parseData(acbx, clnt, fbuf);
+                        } else {
+                            // If it's already an object, process it directly
+                            logger.debug("Processing UABD_ITEMS as an object: {}", item);
+                            // Add logic to handle the object directly if needed
                         }
                     }
                 }
@@ -136,6 +139,7 @@ public class AdabasAuditingFilter implements Filter {
                     e.tag(LOGSTASH_TAG_SKIP_NOT_COMMAND);
                 }
             }
+
         }
         return events;
     }
