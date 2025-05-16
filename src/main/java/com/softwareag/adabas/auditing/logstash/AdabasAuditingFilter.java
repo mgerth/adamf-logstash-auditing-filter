@@ -12,6 +12,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.ibm.guardium.universalconnector.commons.GuardConstants;
 import com.ibm.guardium.universalconnector.commons.structures.Accessor;
 import com.ibm.guardium.universalconnector.commons.structures.Construct;
@@ -19,6 +20,7 @@ import com.ibm.guardium.universalconnector.commons.structures.Data;
 import com.ibm.guardium.universalconnector.commons.structures.Record;
 import com.ibm.guardium.universalconnector.commons.structures.Sentence;
 import com.ibm.guardium.universalconnector.commons.structures.Time;
+import com.ibm.guardium.universalconnector.commons.structures.SessionLocator;
 
 import co.elastic.logstash.api.Configuration;
 import co.elastic.logstash.api.Context;
@@ -73,7 +75,7 @@ public class AdabasAuditingFilter implements Filter {
             Data data = null;
             if (f instanceof HashMap<?, ?>) {
                 final HashMap<String, Object> map = (HashMap<String, Object>) f;
-                logger.debug("Event map: {}", map);
+                logger.error("(Adabas)Event map: {}", map);
                 if (map.containsKey("UABI_ITEMS")) {
                     // extract data from the map
                     final HashMap<String, Object> items = (HashMap<String, Object>) map.get("UABI_ITEMS");
@@ -101,6 +103,7 @@ public class AdabasAuditingFilter implements Filter {
                                         }
                                         // fill accessor data
                                         accessor = parseAccessor(clnt);
+                                        record.setSessionLocator(parserSessionLocator());
                                     }
                                     if (itemMap.containsKey("PAYLOAD_ACBX")) {
                                         acbx = (HashMap<String, Object>) itemMap.get("PAYLOAD_ACBX");
@@ -135,9 +138,20 @@ public class AdabasAuditingFilter implements Filter {
                 } else {
                     e.tag(LOGSTASH_TAG_SKIP_NOT_COMMAND);
                 }
+
             }
         }
         return events;
+    }
+
+    private SessionLocator parserSessionLocator() {
+        SessionLocator sessionLocator = new SessionLocator();
+        sessionLocator.setClientIp("0.0.0.0");
+        sessionLocator.setClientIpv6("0000:0000:0000:0000:0000:FFFF:0000:0000");
+        sessionLocator.setServerPort(0000);
+        sessionLocator.setClientPort(0000);
+        return sessionLocator;
+
     }
 
     @Override
@@ -191,6 +205,7 @@ public class AdabasAuditingFilter implements Filter {
 
     private Construct parseConstruct(HashMap<String, Object> acbx, HashMap<String, Object> fbuf) {
         final Construct construct = new Construct();
+        construct.setFullSql("this is a sql statement");
         construct.sentences.add(parseSentence(acbx, fbuf));
         return construct;
     }
